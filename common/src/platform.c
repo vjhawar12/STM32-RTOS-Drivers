@@ -133,7 +133,7 @@ void uart_Init(void) {
     /* Enable clocks */
     RCC->AHB1ENR |= (1U << 0);    /* GPIOAEN */
     RCC->APB1ENR |= (1U << 17);   /* USART2EN */
-    /* Configure https://github.com/FreeRTOS/FreeRTOS-Kernel/tree/mainPA2 and PA3 as alternate function mode */
+    /* Configure PA2 and PA3 as alternate function mode */
     GPIOA->MODER &= ~(3U << (2U * 2U));
     GPIOA->MODER |=  (2U << (2U * 2U));
     GPIOA->MODER &= ~(3U << (3U * 2U));
