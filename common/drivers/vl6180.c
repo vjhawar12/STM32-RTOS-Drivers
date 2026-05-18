@@ -1,5 +1,7 @@
 #include "vl6180.h"
 #include "i2c.h"
+#include "portmacro.h"
+#include "projdefs.h"
 #include "stdbool.h"
 #include "stm32f401xe.h"
 #include "platform.h"
@@ -7,6 +9,7 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
+#include "irq.h"
 
 #define IDENTIFICATION__MODEL_ID 0x00
 #define SYSRANGE__START 0x018
@@ -20,6 +23,7 @@
 #define DEVID 0xB4
 
 MODE mode;
+TaskHandle_t acquisition_task_handle; 
 
 bool vl6180_alive() {
     uint8_t id = 0; 
@@ -52,45 +56,34 @@ bool vl6180_init() {
     return error == 0;
 }
 
-void vl3l0x_set_mode(MODE _mode) {
-    mode = _mode;
-    if (mode == CONTINUOUS) {
-        i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 1)); 
-        i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO | (0b100 << 0)); 
-    } else {
-        i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START & ~(0b1 << 1)); 
-        i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO & ~(0b111 << 0)); 
-    }
+void vl3l0x_set_continuous(TaskHandle_t _acquisition_task_handle) {
+    mode = CONTINUOUS;
+    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 1)); 
+    i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO | (0b100 << 0)); 
+    acquisition_task_handle = _acquisition_task_handle;
+}
+
+void vl310x_set_singleshot() {
+    mode = SINGLESHOT; 
+    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START & ~(0b1 << 1)); 
+    i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO & ~(0b111 << 0)); 
 }
 
 void vl6180_read_distance_mm(vl6180_sample_t *sample) {
     if (mode == SINGLESHOT) {
         i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 0));  
-        uint8_t distance;
-        i2c_read_reg(DEVID, RESULT__RANGE_VAL, &distance);
-        sample->timestamp = xTaskGetTickCount() / portTICK_RATE_MS;
-        sample->distance = distance; 
-        uint8_t error;
-        i2c_read_reg(DEVID, RESULT__RANGE_STATUS, &error); 
-        sample->valid = error == 0; 
-    } 
-}
-
-void vl6180_isr(QueueHandle_t queue) {
+    }
     uint8_t distance;
     i2c_read_reg(DEVID, RESULT__RANGE_VAL, &distance);
+    sample->timestamp = xTaskGetTickCount() / portTICK_RATE_MS;
+    sample->distance = distance; 
     uint8_t error;
     i2c_read_reg(DEVID, RESULT__RANGE_STATUS, &error); 
-    vl6180_sample_t sample = {
-        .distance = distance,
-        .timestamp = xTaskGetTickCount() / portTICK_RATE_MS,
-        .valid = error == 0.
-    }; 
-    BaseType_t pxHigherPriorityTaskWoken; 
-    xQueueSendFromISR(queue, &sample, &pxHigherPriorityTaskWoken); 
+    sample->valid = error == 0; 
 }
 
-
-
-
+void vl6180_isr() {
+    BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(acquisition_task_handle, &pxHigherPriorityTaskWoken);
+}
 

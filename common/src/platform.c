@@ -224,5 +224,11 @@ void burn_cycles(uint32_t cycles) {
 }
 
 void enable_gpio_interrupts() {
-    
+    // writing 0000 to SYSCFG_EXTICR2 at bit 0
+    SYSCFG->EXTICR[2] &= ~(0b1111 << 0); 
+    NVIC_EnableIRQ(8); 
+}
+
+void EXTI2_IRQHandler() {
+    tof_isr();
 }
