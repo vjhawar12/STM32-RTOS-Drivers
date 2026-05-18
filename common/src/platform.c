@@ -222,3 +222,7 @@ void burn_cycles(uint32_t cycles) {
         cycles--;
     }
 }
+
+void enable_gpio_interrupts() {
+    
+}

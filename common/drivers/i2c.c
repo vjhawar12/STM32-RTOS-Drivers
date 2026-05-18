@@ -173,7 +173,7 @@ void i2c_read_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t *buffer) {
     I2C1->DR = (reg_addr << 0);
     // wait for transfer to be finished
     while ((I2C1->SR1 & (1 << 2)) == 0) {}
-     // set start bit
+    // set start bit
     I2C1->CR1 |= (0b1 << 8);
     // wait for start condition to be generated
     while ((I2C1->SR1 & (1 << 0)) == 0) {}
@@ -196,6 +196,9 @@ void i2c_read_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t *buffer) {
 }
 
 void i2c_read_regs(uint8_t address_byte, uint8_t start_reg, uint8_t *buffer, uint8_t length) {
+    if (length == 1) {
+        i2c_read_reg(address_byte, start_reg,  buffer); 
+    }
      // while bus busy
     while (I2C1->SR2 & (1 << 1)) {}
     // set start bit
@@ -218,23 +221,21 @@ void i2c_read_regs(uint8_t address_byte, uint8_t start_reg, uint8_t *buffer, uin
     I2C1->CR1 |= (0b1 << 8);
     // wait for start condition to be generated
     while ((I2C1->SR1 & (1 << 0)) == 0) {}
-    // disable ACK
-    I2C1->CR1 &= ~(0b1 << 10);
     // send address + r bit to SDA
     I2C1->DR = (((address_byte << 1) | 0b1) << 0);
     // read sr1 and sr2 to clear ADDR
     while ((I2C1->SR1 & (1 << 1)) == 0) {}
     sr2 = I2C1->SR1;
     sr2 = I2C1->SR2;
-    // reenable ACK
-    I2C1->CR1 |= (0b1 << 10); 
+    // explicitly set ACK
+    I2C1->CR1 |= (0b1 << 10);
     int i = 0;
     for (i = 0; i < length; i++) {
         if (i == length - 1) {
+             // disable ACK
+            I2C1->CR1 &= ~(0b1 << 10);
             // set stop bit
             I2C1->CR1 |= (0b1 << 9);
-            // disable ACK
-            I2C1->CR1 &= ~(0b1 << 10);
         }
         // wait for receive data register to be full
         while ((I2C1->SR1 & (1 << 6)) == 0) {}
