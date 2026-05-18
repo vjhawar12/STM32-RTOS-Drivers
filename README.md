@@ -17,10 +17,19 @@ This repository builds from core RTOS primitives into practical embedded applica
 
 ## Low-Level Driver Work
 
-This repo includes a register-level SPI2 driver for the STM32F401RE and an ADXL345 accelerometer driver layered on top of it.
+This repo includes multiple drivers: 
+
+1. A register-level SPI2 driver for the STM32F401RE
+2. An ADXL345 accelerometer driver layered on the SPI driver
+3. A register-level I2C driver for the STM32F401RE
+4. A VL6180 TOF sensor driver layered on the I2C driver
+
+Written in the following files: 
 
 - `common/drivers/spi.c` — SPI2 initialization, GPIO alternate-function setup, chip-select control, and blocking SPI transfers
 - `common/drivers/adxl345.c` — ADXL345 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
+- `common/drivers/i2c.c` — I2C initialization, GPIO alternate-function setup, ACK/NACK reception, and blocking I2C transfers
+- `common/drivers/vl6180.c` — VL6180 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
 
 This demonstrates direct peripheral configuration, reusable bus-driver design, and device-driver integration under FreeRTOS.
 
@@ -47,7 +56,7 @@ This demonstrates direct peripheral configuration, reusable bus-driver design, a
 | Lab | Topic | Concepts |
 |---|---|---|
 | Lab 10 | SPI Accelerometer Integration | ADXL345 driver, acquisition task, queue-based processing |
-| Lab 11 | I2C Distance Sensor Integration | I2C bus driver, proximity/range sensor driver, periodic sampling |
+| Lab 11 | I2C TOF Sensor Integration | I2C bus driver, proximity/range sensor driver, periodic sampling |
 | Lab 12 | Multi-Sensor RTOS Application | SPI + I2C telemetry, mixed-rate tasks, modular architecture |
 | Lab 13 | System Health and Reliability | stack/heap monitoring, watchdog concepts, fault handling |
 

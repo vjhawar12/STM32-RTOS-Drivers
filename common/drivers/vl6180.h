@@ -1,14 +1,14 @@
-#ifndef VL53L0X_H
-#define VL53L0X_H
+#ifndef VL6180_H
+#define VL6180_H
 
 #include "stdbool.h"
 #include "stdint.h"
 
-typedef struct vl53l0x_sample_t {
+typedef struct vl6180_sample_t {
     uint32_t timestamp;
     uint16_t distance;
     bool valid;
-} vl53l0x_sample_t; 
+} vl6180_sample_t; 
 
 typedef enum MODE {
     CONTINUOUS,
@@ -20,13 +20,13 @@ typedef enum MODE {
 // configure measurement mode
 // configure ranging mode
 // start measurement mode
-bool vl53l0x_init();
+bool vl6180_init();
 
 // return true if alive
-bool vl53l0x_alive(); 
+bool vl6180_alive(); 
 
 // returns distance in mm
-void vl53l0x_read_distance_mm(vl53l0x_sample_t *sample);
+void vl6180_read_distance_mm(vl6180_sample_t *sample);
 
 
 

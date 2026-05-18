@@ -1,4 +1,4 @@
-#include "vl53l0x.h"
+#include "vl6180.h"
 #include "i2c.h"
 #include "stdbool.h"
 #include "stm32f401xe.h"
@@ -21,7 +21,7 @@
 
 MODE mode;
 
-bool vl53l0x_alive() {
+bool vl6180_alive() {
     uint8_t id = 0; 
     i2c_read_reg(DEVID, IDENTIFICATION__MODEL_ID, &id); 
     return id == DEVID; 
@@ -36,7 +36,7 @@ Wait 1 ms
 now it is possible to configure the device and start single-shot or continuous
 ranging operation
 */
-bool vl53l0x_init() {
+bool vl6180_init() {
     GPIOA->ODR &= ~(1 << 3); 
     burn_cycles(PERIOD_1S_CYCLES / 1000); 
     GPIOA->ODR |= (1 << 3); 
@@ -63,7 +63,7 @@ void vl3l0x_set_mode(MODE _mode) {
     }
 }
 
-void vl53l0x_read_distance_mm(vl53l0x_sample_t *sample) {
+void vl6180_read_distance_mm(vl6180_sample_t *sample) {
     if (mode == SINGLESHOT) {
         i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 0));  
         uint8_t distance;
@@ -76,12 +76,12 @@ void vl53l0x_read_distance_mm(vl53l0x_sample_t *sample) {
     } 
 }
 
-void vl53l0x_isr(QueueHandle_t queue) {
+void vl6180_isr(QueueHandle_t queue) {
     uint8_t distance;
     i2c_read_reg(DEVID, RESULT__RANGE_VAL, &distance);
     uint8_t error;
     i2c_read_reg(DEVID, RESULT__RANGE_STATUS, &error); 
-    vl53l0x_sample_t sample = {
+    vl6180_sample_t sample = {
         .distance = distance,
         .timestamp = xTaskGetTickCount() / portTICK_RATE_MS,
         .valid = error == 0.
