@@ -125,7 +125,7 @@ void i2c_read(uint8_t address_byte, uint8_t *buffer) {
     I2C1->CR1 |= (0b1 << 10);
 }
 
-void i2c_write_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t data_byte) {
+void i2c_write_reg16(uint8_t address_byte, uint16_t reg_addr, uint8_t data_byte) {
     // while bus busy
     while (I2C1->SR2 & (1 << 1)) {}
     // set start bit
@@ -141,7 +141,13 @@ void i2c_write_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t data_byte) {
     // wait for transmit data register to be empty
     while ((I2C1->SR1 & (1 << 7)) == 0) {}
     // send data byte to SDA 
-    I2C1->DR = (reg_addr << 0);
+    I2C1->DR = (reg_addr >> 8);
+    // wait for transfer to be finished
+    while ((I2C1->SR1 & (1 << 2)) == 0) {}
+     // wait for transmit data register to be empty
+    while ((I2C1->SR1 & (1 << 7)) == 0) {}
+    // send data byte to SDA 
+    I2C1->DR = (reg_addr & 0xFF);
     // wait for transfer to be finished
     while ((I2C1->SR1 & (1 << 2)) == 0) {}
     // wait for transmit data register to be empty
@@ -154,7 +160,7 @@ void i2c_write_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t data_byte) {
     I2C1->CR1 |= (0b1 << 9); 
 }
 
-void i2c_read_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t *buffer) {
+void i2c_read_reg16(uint8_t address_byte, uint16_t reg_addr, uint8_t *buffer) {
     // while bus busy
     while (I2C1->SR2 & (1 << 1)) {}
     // set start bit
@@ -170,7 +176,13 @@ void i2c_read_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t *buffer) {
     // wait for transmit data register to be empty
     while ((I2C1->SR1 & (1 << 7)) == 0) {}
     // send data byte to SDA 
-    I2C1->DR = (reg_addr << 0);
+    I2C1->DR = (reg_addr >> 8);
+    // wait for transfer to be finished
+    while ((I2C1->SR1 & (1 << 2)) == 0) {}
+    // wait for transmit data register to be empty
+    while ((I2C1->SR1 & (1 << 7)) == 0) {}
+    // send data byte to SDA 
+    I2C1->DR = (reg_addr & 0xFF);
     // wait for transfer to be finished
     while ((I2C1->SR1 & (1 << 2)) == 0) {}
     // set start bit
@@ -195,9 +207,10 @@ void i2c_read_reg(uint8_t address_byte, uint8_t reg_addr, uint8_t *buffer) {
     I2C1->CR1 |= (0b1 << 10);
 }
 
-void i2c_read_regs(uint8_t address_byte, uint8_t start_reg, uint8_t *buffer, uint8_t length) {
+void i2c_read_regs16(uint8_t address_byte, uint16_t start_reg, uint8_t *buffer, uint8_t length) {
     if (length == 1) {
-        i2c_read_reg(address_byte, start_reg,  buffer); 
+        i2c_read_reg16(address_byte, start_reg,  buffer);
+        return;
     }
      // while bus busy
     while (I2C1->SR2 & (1 << 1)) {}
@@ -214,10 +227,16 @@ void i2c_read_regs(uint8_t address_byte, uint8_t start_reg, uint8_t *buffer, uin
     // wait for transmit data register to be empty
     while ((I2C1->SR1 & (1 << 7)) == 0) {}
     // send data byte to SDA 
-    I2C1->DR = (start_reg << 0);
+    I2C1->DR = (start_reg >> 8);
     // wait for transfer to be finished
     while ((I2C1->SR1 & (1 << 2)) == 0) {}
-     // set start bit
+    // wait for transmit data register to be empty
+    while ((I2C1->SR1 & (1 << 7)) == 0) {}
+    // send data byte to SDA 
+    I2C1->DR = (start_reg & 0xFF);
+    // wait for transfer to be finished
+    while ((I2C1->SR1 & (1 << 2)) == 0) {}
+    // set start bit
     I2C1->CR1 |= (0b1 << 8);
     // wait for start condition to be generated
     while ((I2C1->SR1 & (1 << 0)) == 0) {}

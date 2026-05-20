@@ -31,10 +31,10 @@ bool vl6180_alive();
 void vl6180_read_distance_mm(vl6180_sample_t *sample);
 
 // set mode to continuous
-void vl3l0x_set_continuous(TaskHandle_t _acquisition_task_handle);
+void vl6180_set_continuous(TaskHandle_t _acquisition_task_handle);
 
 // set mode to singleshot
-void vl310x_set_singleshot();
+void vl6180_set_singleshot();
 
 
 #endif

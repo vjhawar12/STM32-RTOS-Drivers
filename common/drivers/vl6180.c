@@ -20,15 +20,16 @@
 #define RESULT__RANGE_STATUS 0x04D
 #define SYSTEM__INTERRUPT_CONFIG_GPIO 0x014
 #define PERIOD_1S_CYCLES 8084000
-#define DEVID 0xB4
+#define DEVID 0x29
+#define MODEL_ID 0xB4
 
 MODE mode;
 TaskHandle_t acquisition_task_handle; 
 
 bool vl6180_alive() {
     uint8_t id = 0; 
-    i2c_read_reg(DEVID, IDENTIFICATION__MODEL_ID, &id); 
-    return id == DEVID; 
+    i2c_read_reg16(DEVID, IDENTIFICATION__MODEL_ID, &id); 
+    return id == MODEL_ID; 
 }
 
 
@@ -46,44 +47,43 @@ bool vl6180_init() {
     GPIOA->ODR |= (1 << 3); 
     GPIOA->ODR |= (1 << 4);
     burn_cycles(PERIOD_1S_CYCLES / 1000); 
-    i2c_write_reg(DEVID, SYSRANGE__THRESH_HIGH, 0xFF); 
-    i2c_write_reg(DEVID, SYSRANGE__THRESH_LOW, 0x05); 
-    i2c_write_reg(DEVID, SYSRANGE__INTERMEASUREMENT_PERIOD, 0x0A); 
-    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START & ~(0b1 << 1)); 
-    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 0)); 
+    i2c_write_reg16(DEVID, SYSRANGE__THRESH_HIGH, 0xFF); 
+    i2c_write_reg16(DEVID, SYSRANGE__THRESH_LOW, 0x05); 
+    i2c_write_reg16(DEVID, SYSRANGE__INTERMEASUREMENT_PERIOD, 0x0A); 
     uint8_t error = 0xF;
-    i2c_read_reg(DEVID, RESULT__RANGE_STATUS, &error); 
+    i2c_read_reg16(DEVID, RESULT__RANGE_STATUS, &error); 
     return error == 0;
 }
 
-void vl3l0x_set_continuous(TaskHandle_t _acquisition_task_handle) {
+void vl6180_set_continuous(TaskHandle_t _acquisition_task_handle) {
     mode = CONTINUOUS;
-    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 1)); 
-    i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO | (0b100 << 0)); 
+    i2c_write_reg16(DEVID, SYSRANGE__START,  0b11); 
+    i2c_write_reg16(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, (0b100 << 0)); 
     acquisition_task_handle = _acquisition_task_handle;
-}
+}   
 
-void vl310x_set_singleshot() {
+void vl6180_set_singleshot() {
     mode = SINGLESHOT; 
-    i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START & ~(0b1 << 1)); 
-    i2c_write_reg(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, SYSTEM__INTERRUPT_CONFIG_GPIO & ~(0b111 << 0)); 
+    i2c_write_reg16(DEVID, SYSRANGE__START, 0b0); 
+    i2c_write_reg16(DEVID, SYSTEM__INTERRUPT_CONFIG_GPIO, 0b0); 
 }
 
 void vl6180_read_distance_mm(vl6180_sample_t *sample) {
     if (mode == SINGLESHOT) {
-        i2c_write_reg(DEVID, SYSRANGE__START, SYSRANGE__START | (0b1 << 0));  
+        i2c_write_reg16(DEVID, SYSRANGE__START, (0b1 << 0));  
     }
     uint8_t distance;
-    i2c_read_reg(DEVID, RESULT__RANGE_VAL, &distance);
-    sample->timestamp = xTaskGetTickCount() / portTICK_RATE_MS;
+    i2c_read_reg16(DEVID, RESULT__RANGE_VAL, &distance);
+    sample->timestamp = xTaskGetTickCount() * portTICK_PERIOD_MS;
     sample->distance = distance; 
     uint8_t error;
-    i2c_read_reg(DEVID, RESULT__RANGE_STATUS, &error); 
-    sample->valid = error == 0; 
+    i2c_read_reg16(DEVID, RESULT__RANGE_STATUS, &error); 
+    sample->valid = error >> 4 == 0b0; 
 }
 
 void vl6180_isr() {
     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(acquisition_task_handle, &pxHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(pxHigherPriorityTaskWoken); 
 }
 
