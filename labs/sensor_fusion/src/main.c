@@ -34,10 +34,10 @@ typedef enum message_type_t {
 } message_type_t; 
 
 typedef enum tof_state {
-    CLOSE = 0,
-    CRITICAL = 1,
-    INVALID = 2,
-    CLEAR = 3
+    CLEAR = 0,
+    CLOSE = 1,
+    CRITICAL = 2,
+    INVALID = 3,
 } tof_state;
 
 typedef enum accel_state {
@@ -46,6 +46,14 @@ typedef enum accel_state {
     SHAKING = 6,
     INVALID_ = 7,
 } accel_state;
+
+typedef enum system_state {
+    FULLCLEAR = 8,
+    NEAR_OBJECT = 9,
+    OBSTACLE_WHILE_MOVING = 10,
+    VIBRATION_OR_IMPACT = 11,
+    SENSOR_FAULT = 12
+} system_state; 
 
 typedef struct mixed_sensor_data_t {
     message_type_t message_type;
@@ -76,7 +84,7 @@ char* get_label(int value) {
         case SHAKING:
             return "MOTION: SHAKING";
             break;
-        case INVALID:
+        case INVALID_:
             return "MOTION: INVALID";
             break;
         case CLOSE:
@@ -85,11 +93,26 @@ char* get_label(int value) {
         case CRITICAL:
             return "PROXIMITY: CRITICAL";
             break;
-        case INVALID_:
+        case INVALID:
             return "PROXIMITY: INVALID";
             break;
         case CLEAR:
             return "PROXIMITY: CLEAR";
+            break;
+        case FULLCLEAR:
+            return "SYSTEM STATE: CLEAR";
+            break;
+        case NEAR_OBJECT:
+            return "SYSTEM STATE: NEAR OBJECT"; 
+            break;
+        case OBSTACLE_WHILE_MOVING:
+            return "SYSTEM STATE: OBSTACLE WHILE MOVING"; 
+            break;
+        case VIBRATION_OR_IMPACT:
+            return "SYSTEM STATE: VIBRATION OR IMPACT";
+            break;
+        case SENSOR_FAULT:
+            return "SYSTEM STATE: SENSOR FAULT";
             break;
     }
     return "INVALID"; 
@@ -139,16 +162,38 @@ void accel_data_retrieval(void* pvParams) {
     }
 }
 
+system_state get_system_state(int tof_state, int accel_state) {
+    if (tof_state == CLEAR && accel_state == STABLE) {
+        return FULLCLEAR; 
+    } else if (tof_state == INVALID || accel_state == INVALID_) {
+        return SENSOR_FAULT; 
+    } else if (tof_state == CLOSE && accel_state == MOVING) {
+        return OBSTACLE_WHILE_MOVING;
+    } else if (tof_state == CLOSE && accel_state == STABLE) {
+        return NEAR_OBJECT;
+    } else if (tof_state == CRITICAL && accel_state > STABLE) {
+        return VIBRATION_OR_IMPACT;
+    } else {
+        return SENSOR_FAULT;
+    }
+}   
+
 void data_processing(void *pvParams) {
     mixed_sensor_data_t data;
+    tof_state _tof_state = INVALID;
+    accel_state _accel_state = INVALID_;
     char buffer[128];
     while (1) {
         xQueueReceive(sensor_queue, &data, portMAX_DELAY); 
         if (data.message_type == ACCEL) {
-            snprintf(buffer, 64, "[%lu ms] ACCEL x: %d y: %d z: %d | %s\r\n", data.data.accel.timestamp, data.data.accel.accel_x, data.data.accel.accel_y, data.data.accel.accel_z,  get_label(data.state));
+            snprintf(buffer, 128, "[%u ms] ACCEL x: %d y: %d z: %d | %s\r\n", data.data.accel.timestamp, data.data.accel.accel_x, data.data.accel.accel_y, data.data.accel.accel_z,  get_label(data.state));
+            _accel_state = data.state;
         } else if (data.message_type == TOF) {
-            snprintf(buffer, 64, "[%lu ms] TOF distance: %d mm | %s\r\n", data.data.tof.timestamp, data.data.tof.distance, get_label(data.state));
+            snprintf(buffer, 128, "[%u ms] TOF distance: %d mm | %s\r\n", data.data.tof.timestamp, data.data.tof.distance, get_label(data.state));
+            _tof_state = data.state;
         }
+        uart_outstring(buffer); 
+        snprintf(buffer, 128, "[%u ms] System State: %s\r\n", xTaskGetTickCount() * 1000 / configTICK_RATE_HZ, get_label(get_system_state(_tof_state, _accel_state))); 
         uart_outstring(buffer); 
     }
 }
