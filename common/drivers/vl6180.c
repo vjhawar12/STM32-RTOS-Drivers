@@ -19,6 +19,7 @@
 #define RESULT__RANGE_VAL 0x062
 #define RESULT__RANGE_STATUS 0x04D
 #define SYSTEM__INTERRUPT_CONFIG_GPIO 0x014
+#define SYSTEM__INTERRUPT_CLEAR 0x015
 #define PERIOD_1S_CYCLES 8084000
 #define DEVID 0x29
 #define MODEL_ID 0xB4
@@ -82,6 +83,7 @@ void vl6180_read_distance_mm(vl6180_sample_t *sample) {
 }
 
 void vl6180_isr() {
+    i2c_write_reg16(DEVID, SYSTEM__INTERRUPT_CLEAR, 0b0); 
     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(acquisition_task_handle, &pxHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken); 
