@@ -21,6 +21,12 @@ NOTE: The peripheral driver for this is in /common/drivers. This file uses that 
 
 #define PERIOD_1S_CYCLES 8084000
 #define PERIOD_100MS 1000
+#define CRITICAL_THRESH 100
+#define CLOSE_THRESH 300
+#define CLEAR_THRESH 500
+#define STABLE_THRESH 100
+#define MOVING_THRESH 200
+#define SHAKING_THRESH 500
 
 typedef enum message_type_t {
     ACCEL,
@@ -28,26 +34,26 @@ typedef enum message_type_t {
 } message_type_t; 
 
 typedef enum tof_state {
-    CLOSE,
-    CRITICAL,
-    INVALID,
-    CLEAR
+    CLOSE = 0,
+    CRITICAL = 1,
+    INVALID = 2,
+    CLEAR = 3
 } tof_state;
 
 typedef enum accel_state {
-    STABLE,
-    MOVING,
-    SHAKING
+    STABLE = 4,
+    MOVING = 5,
+    SHAKING = 6,
+    INVALID_ = 7,
 } accel_state;
 
 typedef struct mixed_sensor_data_t {
     message_type_t message_type;
-    uint32_t timestamp;
-    char label[64];
     union {
         vl6180_sample_t tof;
         adxl345_sample_t accel;
     } data; 
+    int state;
 } mixed_sensor_data_t;
 
 QueueHandle_t sensor_queue;
@@ -59,6 +65,36 @@ void periodic_timer_isr() {
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken); 
 }
 
+char* get_label(int value) {
+    switch (value) {
+        case STABLE:
+            return "MOTION: STABLE";
+            break;
+        case MOVING:
+            return "MOTION: MOVING";
+            break;
+        case SHAKING:
+            return "MOTION: SHAKING";
+            break;
+        case INVALID:
+            return "MOTION: INVALID";
+            break;
+        case CLOSE:
+            return "PROXIMITY: CLOSE";
+            break;
+        case CRITICAL:
+            return "PROXIMITY: CRITICAL";
+            break;
+        case INVALID_:
+            return "PROXIMITY: INVALID";
+            break;
+        case CLEAR:
+            return "PROXIMITY: CLEAR";
+            break;
+    }
+    return "INVALID"; 
+}
+
 void tof_data_retrieval(void *pvParams) {
     mixed_sensor_data_t sensor_data; 
     vl6180_sample_t tof_sample;
@@ -67,22 +103,18 @@ void tof_data_retrieval(void *pvParams) {
         vl6180_read_distance_mm(&tof_sample);
         sensor_data.message_type = TOF;
         sensor_data.data.tof = tof_sample;   
-        if (sensor_data.data.tof.distance < 100) {
-            strcpy(sensor_data.label, "PROXIMITY: CRITICAL"); 
-        } else if (sensor_data.data.tof.distance < 300) {
-            strcpy(sensor_data.label, "PROXIMITY: CLOSE"); 
-        } else if (sensor_data.data.tof.distance >= 300 && sensor_data.data.tof.distance < 1000) {
-            strcpy(sensor_data.label, "PROXIMITY: CLEAR"); 
+        if (sensor_data.data.tof.distance < CRITICAL_THRESH) {
+            sensor_data.state = CRITICAL; 
+        } else if (sensor_data.data.tof.distance < CLOSE_THRESH) {
+            sensor_data.state = CLOSE; 
+        } else if (sensor_data.data.tof.distance >= CLOSE_THRESH && sensor_data.data.tof.distance < CLEAR_THRESH) {
+            sensor_data.state = CLEAR; 
         } else {
-            strcpy(sensor_data.label, "PROXIMITY: INVALID"); 
+            sensor_data.state = INVALID; 
         }
-        sensor_data.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
+        sensor_data.data.tof.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
         xQueueSend(sensor_queue, &sensor_data, pdMS_TO_TICKS(200)); 
     }
-}
-
-float get_accel(adxl345_sample_t *accel) {
-    return sqrtf(accel->accel_x * accel->accel_x) + (accel->accel_x * accel->accel_x) + (accel->accel_x * accel->accel_x); 
 }
 
 void accel_data_retrieval(void* pvParams) {
@@ -93,20 +125,29 @@ void accel_data_retrieval(void* pvParams) {
         adxl345_read_xyz(&accel_sample); 
         sensor_data.message_type = ACCEL;
         sensor_data.data.accel = accel_sample;
-        sensor_data.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
+        if (sensor_data.data.accel.delta <= STABLE_THRESH) {
+            sensor_data.state = STABLE;
+        } else if (sensor_data.data.accel.delta <= MOVING_THRESH) {
+            sensor_data.state = MOVING; 
+        } else if (sensor_data.data.accel.delta >= MOVING_THRESH && sensor_data.data.accel.delta < SHAKING_THRESH) {
+            sensor_data.state = SHAKING;
+        } else {
+            sensor_data.state = INVALID;
+        }
+        sensor_data.data.accel.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
         xQueueSend(sensor_queue, &sensor_data, pdMS_TO_TICKS(200)); 
     }
 }
 
 void data_processing(void *pvParams) {
     mixed_sensor_data_t data;
-    char buffer[64];
+    char buffer[128];
     while (1) {
         xQueueReceive(sensor_queue, &data, portMAX_DELAY); 
         if (data.message_type == ACCEL) {
-            snprintf(buffer, 64, "[%d ms] ACCEL x: %d y: %d z: %d | %s\r\n", data.timestamp, data.data.accel.accel_x, data.data.accel.accel_y, data.data.accel.accel_z, data.label); 
+            snprintf(buffer, 64, "[%lu ms] ACCEL x: %d y: %d z: %d | %s\r\n", data.data.accel.timestamp, data.data.accel.accel_x, data.data.accel.accel_y, data.data.accel.accel_z,  get_label(data.state));
         } else if (data.message_type == TOF) {
-            snprintf(buffer, 64, "[%d ms] TOF distance: %d mm | %s\r\n", data.timestamp, data.data.tof.distance, data.label);
+            snprintf(buffer, 64, "[%lu ms] TOF distance: %d mm | %s\r\n", data.data.tof.timestamp, data.data.tof.distance, get_label(data.state));
         }
         uart_outstring(buffer); 
     }
@@ -118,11 +159,11 @@ int main(void) {
     uart_Init();
     i2c_init();
     periodic_timer_init(PERIOD_100MS); 
+    // queue with 8 capacity accomodates delays in processing task without losing the sample
+    sensor_queue = xQueueCreate(8, sizeof(mixed_sensor_data_t)); 
     xTaskCreate(tof_data_retrieval, "tof task", 512, NULL, 7, &tof_task_handle);
     xTaskCreate(accel_data_retrieval, "accel task", 512, NULL, 7, &accel_task_handle);
     xTaskCreate(data_processing, "processing task", 512,NULL, 5, &processing_task_handle);
-    // queue with 8 capacity accomodates delays in processing task without losing the sample
-    sensor_queue = xQueueCreate(8, sizeof(mixed_sensor_data_t)); 
     uart_enable_rx_interrupt();
     adxl345_init();
     bool tof_alive = vl6180_alive();

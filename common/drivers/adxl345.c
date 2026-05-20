@@ -2,6 +2,7 @@
 #include "spi.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include "math.h"
 
 // device ID
 #define DEVID 0x00
@@ -112,6 +113,9 @@ bool adxl345_read_xyz(adxl345_sample_t *sample) {
     uint16_t accel_z = ((uint16_t)accel_buffer[5] << 8) | accel_buffer[4]; 
     sample->accel_x = (int16_t)accel_x; 
     sample->accel_y = (int16_t)accel_y;
-    sample->accel_z = (int16_t)accel_z; 
+    sample->accel_z = (int16_t)accel_z;
+    sample->mag_sq_prev = sample->mag_sq; 
+    sample->mag_sq = sample->accel_x * sample->accel_x + sample->accel_y * sample->accel_y + sample->accel_z * sample->accel_z; 
+    sample->delta = abs(sample->mag_sq - sample->mag_sq_prev); 
     return true;
 }
