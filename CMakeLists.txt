@@ -9,7 +9,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-set(LAB_NAME "sensor_fusion" CACHE STRING "Lab to build")
+set(LAB_NAME "health_monitor_sensor_fusion" CACHE STRING "Lab to build")
 
 set(MCU_FLAGS
     -mcpu=cortex-m4
