@@ -232,3 +232,33 @@ void enable_gpio_interrupts() {
 void EXTI2_IRQHandler() {
     tof_isr();
 }
+
+void iwdg_init() {
+    IWDG->KR = 0x5555;
+    IWDG->PR = 0b011; // 1 khz freq ==> 1 ms period 
+    IWDG->RLR = 2000; // 2000 * 1ms = 2 seconds
+}
+
+void iwdg_start() {
+    IWDG->KR = 0xCCCC; 
+}
+
+void iwdg_reload() {
+    IWDG->KR = 0xAAAA; 
+}
+
+__attribute__((weak)) void uart2_isr() {
+
+}
+
+__attribute__((weak)) void tim2_isr() {
+
+}
+
+__attribute__((weak)) void tof_isr() {
+
+}
+
+__attribute__((weak)) void tim3_isr() {
+
+}

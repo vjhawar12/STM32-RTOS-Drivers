@@ -9,7 +9,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-set(LAB_NAME "low_level_driver_rtos" CACHE STRING "Lab to build")
+set(LAB_NAME "health_monitor_sensor_fusion" CACHE STRING "Lab to build")
 
 set(MCU_FLAGS
     -mcpu=cortex-m4
@@ -47,6 +47,8 @@ set(COMMON_SOURCES
     ${CMAKE_SOURCE_DIR}/common/src/platform.c
     ${CMAKE_SOURCE_DIR}/common/drivers/spi.c
     ${CMAKE_SOURCE_DIR}/common/drivers/adxl345.c
+    ${CMAKE_SOURCE_DIR}/common/drivers/i2c.c
+    ${CMAKE_SOURCE_DIR}/common/drivers/vl6180.c
 )
 
 set(FREERTOS_SOURCES
@@ -57,6 +59,7 @@ set(FREERTOS_SOURCES
     ${CMAKE_SOURCE_DIR}/freertos/port.c
     ${CMAKE_SOURCE_DIR}/freertos/syscalls.c
     ${CMAKE_SOURCE_DIR}/freertos/timers.c
+    ${CMAKE_SOURCE_DIR}/freertos/event_groups.c
 )
 
 set(LAB_MAIN

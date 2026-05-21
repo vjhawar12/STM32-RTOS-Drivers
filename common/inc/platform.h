@@ -24,5 +24,9 @@ void burn_cycles(uint32_t cycles);
 void toggle_led2(uint32_t cycles);
 void turnon_led2();
 void turnoff_led2();
+void iwdg_init();
+void iwdg_start();
+void iwdg_reload();
+
 
 #endif

@@ -1,19 +1,19 @@
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
 #include "irq.h"
+#include "portable.h"
 #include "portmacro.h"
 #include "projdefs.h"
 #include "platform.h"
 #include "task.h"
 #include <stdint.h>
-#include <string.h>
 #include "stdio.h"
 #include "semphr.h"
 #include "timers.h"
-#include "adxl345.h" 
-#include "math.h"
+#include "adxl345.h"
 #include "vl6180.h"
 #include "i2c.h"
+#include "event_groups.h"
 
 /* 
 NOTE: The peripheral driver for this is in /common/drivers. This file uses that driver I wrote. 
@@ -27,6 +27,11 @@ NOTE: The peripheral driver for this is in /common/drivers. This file uses that 
 #define STABLE_THRESH 100
 #define MOVING_THRESH 200
 #define SHAKING_THRESH 500
+#define TOF_BIT (1 << 0)
+#define ACCEL_BIT (1 << 1)
+#define PROCESSING_BIT (1 << 2)
+#define HEALTH_BIT (1 << 3)
+#define REQUIRED_BITS (TOF_BIT | ACCEL_BIT | PROCESSING_BIT | HEALTH_BIT)
 
 typedef enum message_type_t {
     ACCEL,
@@ -65,7 +70,9 @@ typedef struct mixed_sensor_data_t {
 } mixed_sensor_data_t;
 
 QueueHandle_t sensor_queue;
-TaskHandle_t tof_task_handle, accel_task_handle, processing_task_handle;
+TaskHandle_t tof_task_handle, accel_task_handle, processing_task_handle, health_task_handle;
+EventGroupHandle_t sensor_group;
+
 
 void periodic_timer_isr() {
     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
@@ -137,6 +144,7 @@ void tof_data_retrieval(void *pvParams) {
         }
         sensor_data.data.tof.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
         xQueueSend(sensor_queue, &sensor_data, pdMS_TO_TICKS(200)); 
+        xEventGroupSetBits(sensor_group, TOF_BIT); 
     }
 }
 
@@ -162,6 +170,7 @@ void accel_data_retrieval(void* pvParams) {
             }
             sensor_data.data.accel.timestamp = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ; 
             xQueueSend(sensor_queue, &sensor_data, pdMS_TO_TICKS(200)); 
+            xEventGroupSetBits(sensor_group, ACCEL_BIT); 
         }
     }
 }
@@ -199,7 +208,44 @@ void data_processing(void *pvParams) {
         uart_outstring(buffer); 
         snprintf(buffer, 128, "[%u ms] System State: %s\r\n", xTaskGetTickCount() * 1000 / configTICK_RATE_HZ, get_label(get_system_state(_tof_state, _accel_state))); 
         uart_outstring(buffer); 
+        xEventGroupSetBits(sensor_group, PROCESSING_BIT); 
     }
+}
+
+void health_monitor(void* pvParams) {
+    char buffer[128];
+    while (1) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+        uint16_t tof_watermark = uxTaskGetStackHighWaterMark(tof_task_handle);
+        uint16_t accel_watermark = uxTaskGetStackHighWaterMark(accel_task_handle);
+        uint16_t processing_watermark = uxTaskGetStackHighWaterMark(processing_task_handle);
+        xEventGroupSetBits(sensor_group, HEALTH_BIT); 
+        snprintf(buffer, 128, "\r\n[HEALTH] Stack space free:\r\nTOF: %u\r\nAccel: %u\r\nProcessing: %u\r\n", tof_watermark, accel_watermark, processing_watermark); 
+        uart_outstring(buffer);
+        snprintf(buffer, 128, "[HEALTH] Heap usage: %d\r\n", xPortGetFreeHeapSize()); 
+        uart_outstring(buffer); 
+        snprintf(buffer, 128, "[HEALTH] Uptime: %d\r\n", xTaskGetTickCount() * 1000 / configTICK_RATE_HZ); 
+        uart_outstring(buffer);  
+        snprintf(buffer, 128, "[HEALTH] Queue usage: %d free spaces", (int)uxQueueSpacesAvailable(sensor_queue)); 
+        uart_outstring(buffer);  
+        taskYIELD();
+    }   
+}
+
+void watchdog_task(void *pvParams) {
+    while (1) {
+        EventBits_t bits = xEventGroupWaitBits(sensor_group, REQUIRED_BITS, pdTRUE, pdTRUE, pdMS_TO_TICKS(1000));
+        if ((bits & REQUIRED_BITS) == REQUIRED_BITS) {
+            iwdg_reload();
+        } else {
+            xEventGroupClearBits(sensor_group, REQUIRED_BITS); 
+            uart_outstring("WATCHDOG RESET!\r\n"); 
+        }
+    }
+}
+
+void health_timer_callback(TimerHandle_t xTimer) {
+    xTaskNotifyGive(health_task_handle); 
 }
 
 int main(void) {
@@ -207,12 +253,16 @@ int main(void) {
     led2_Init();
     uart_Init();
     i2c_init();
+    iwdg_init();
     periodic_timer_init(PERIOD_100MS); 
     // queue with 8 capacity accomodates delays in processing task without losing the sample
     sensor_queue = xQueueCreate(8, sizeof(mixed_sensor_data_t)); 
+    sensor_group = xEventGroupCreate();
     xTaskCreate(tof_data_retrieval, "tof task", 512, NULL, 7, &tof_task_handle);
     xTaskCreate(accel_data_retrieval, "accel task", 512, NULL, 7, &accel_task_handle);
     xTaskCreate(data_processing, "processing task", 512,NULL, 5, &processing_task_handle);
+    xTaskCreate(health_monitor, "health task", 128,NULL, 3, &health_task_handle);
+    xTaskCreate(watchdog_task, "watchdog task", 256,NULL, 8, NULL);
     uart_enable_rx_interrupt();
     adxl345_init();
     bool tof_alive = vl6180_alive();
@@ -223,6 +273,15 @@ int main(void) {
     vl6180_init();
     vl6180_set_continuous(tof_task_handle); 
     periodic_timer_start(); 
+    TimerHandle_t health_timer = xTimerCreate(
+        "health monitor timer", 
+        pdMS_TO_TICKS(500), 
+        pdTRUE, 
+        NULL, 
+        health_timer_callback
+    ); 
+    xTimerStart(health_timer, 0); 
+    iwdg_start();
     vTaskStartScheduler();
     while (1) {
 
