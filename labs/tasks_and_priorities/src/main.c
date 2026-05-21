@@ -4,6 +4,7 @@
 #include "task.h"
 #include <stdint.h>
 #include "stdio.h"
+#include "uart.h"
 
 #define PERIOD_1S_CYCLES 8084000
 

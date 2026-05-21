@@ -1,7 +1,6 @@
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
 #include "i2c.h"
-#include "irq.h"
 #include "portmacro.h"
 #include "projdefs.h"
 #include "platform.h"
@@ -11,6 +10,7 @@
 #include "semphr.h"
 #include "timers.h"
 #include "vl6180.h" 
+#include "uart.h"
 #include "stdbool.h"
 
 /* 

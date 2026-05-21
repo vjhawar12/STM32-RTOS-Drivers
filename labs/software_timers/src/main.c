@@ -8,6 +8,7 @@
 #include "stdio.h"
 #include "semphr.h"
 #include "timers.h"
+#include "uart.h"
 
 #define PERIOD_1S_CYCLES 8084000
 #define BUFFER_SIZE 64

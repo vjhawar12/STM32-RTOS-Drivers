@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "stdio.h"
 #include "semphr.h"
+#include "uart.h"
 
 #define DELAY_100MS 100
 

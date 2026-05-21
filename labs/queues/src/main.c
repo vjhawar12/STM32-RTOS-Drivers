@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "stdio.h"
 #include "queue.h"
+#include "uart.h"
 
 #define PERIOD_1S_CYCLES 8084000
 

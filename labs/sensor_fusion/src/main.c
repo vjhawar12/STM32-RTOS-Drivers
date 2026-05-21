@@ -6,15 +6,13 @@
 #include "platform.h"
 #include "task.h"
 #include <stdint.h>
-#include <string.h>
 #include "stdio.h"
 #include "semphr.h"
 #include "timers.h"
-#include "adxl345.h" 
-#include "math.h"
+#include "adxl345.h"
 #include "vl6180.h"
 #include "i2c.h"
-
+#include "uart.h"
 /* 
 NOTE: The peripheral driver for this is in /common/drivers. This file uses that driver I wrote. 
 */
