@@ -73,3 +73,19 @@ The current hardware integration path is centered on building a small drone/robo
 SPI accelerometer task      ┐
                             ├── sensor queue → processing/logging task → UART output
 I2C distance sensor task    ┘
+```
+
+## Deliverable
+
+Lab 13 is implemented as `labs/health_monitor_sensor_fusion`.
+
+It uses the sensor fusion features:
+- TOF and Accelerometer sensor data acquisition
+- Sensor data processing and UART transmission
+
+And extends the sensor fusion demo with:
+- stack high-water mark reporting
+- heap and uptime reporting
+- queue space monitoring
+- event-group task liveness bits
+- IWDG watchdog refresh only when all monitored tasks check in
