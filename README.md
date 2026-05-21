@@ -8,9 +8,10 @@ This repository builds from core RTOS primitives into practical embedded applica
 
 - Register-level STM32F401RE peripheral configuration using CMSIS
 - FreeRTOS task scheduling, queues, semaphores, mutexes, timers, and task notifications
-- Custom SPI2 driver and ADXL345 accelerometer driver
+- Custom SPI driver and ADXL345 accelerometer driver
+- Custom I2C driver and VL6180 TOF sensor driver
+- Custom UART driver
 - RTOS-based sensor acquisition and processing pipeline
-- Planned I2C distance/proximity sensor integration
 - Modular driver/application separation for reusable embedded firmware
 
 ---
@@ -23,6 +24,7 @@ This repo includes multiple drivers:
 2. An ADXL345 accelerometer driver layered on the SPI driver
 3. A register-level I2C driver for the STM32F401RE
 4. A VL6180 TOF sensor driver layered on the I2C driver
+5. A UART driver used throughout the project
 
 Written in the following files: 
 
@@ -30,6 +32,7 @@ Written in the following files:
 - `common/drivers/adxl345.c` — ADXL345 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
 - `common/drivers/i2c.c` — I2C initialization, GPIO alternate-function setup, ACK/NACK reception, and blocking I2C transfers
 - `common/drivers/vl6180.c` — VL6180 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
+- `common/drivers/uart.c` — UART initialization, char/byte/string transfer, blocking and non-blocking functions
 
 This demonstrates direct peripheral configuration, reusable bus-driver design, and device-driver integration under FreeRTOS.
 
@@ -70,3 +73,19 @@ The current hardware integration path is centered on building a small drone/robo
 SPI accelerometer task      ┐
                             ├── sensor queue → processing/logging task → UART output
 I2C distance sensor task    ┘
+```
+
+## Deliverable
+
+Lab 13 is implemented as `labs/health_monitor_sensor_fusion`.
+
+It uses the sensor fusion features:
+- TOF and Accelerometer sensor data acquisition
+- Sensor data processing and UART transmission
+
+And extends the sensor fusion demo with:
+- stack high-water mark reporting
+- heap and uptime reporting
+- queue space monitoring
+- event-group task liveness bits
+- IWDG watchdog refresh only when all monitored tasks check in
