@@ -39,6 +39,7 @@ This demonstrates direct peripheral configuration, reusable bus-driver design, a
 ---
 
 ## Hardware Photos
+The labs were tested on physical STM32 Nucleo hardware with external sensor modules, UART logging, and logic-analyzer/protocol-decoder validation of I2C traffic.
 
 <p align="center">
   <img src="/photos/sensor_breadboard.jpg" width="750">
