@@ -38,6 +38,32 @@ This demonstrates direct peripheral configuration, reusable bus-driver design, a
 
 ---
 
+## Hardware Photos
+
+<p align="center">
+  <img src="/photos/sensor_breadboard.jpg" width="750">
+</p>
+
+<p align="center"><em>
+Breadboard hardware setup for the STM32 sensor-interface labs, with an external sensor module wired for I2C validation.
+</em></p>
+
+<p align="center">
+  <img src="docs/images/i2c_logic_analyzer.jpg" width="750">
+</p>
+
+<p align="center"><em>
+Logic-analyzer capture of an I2C transaction used to validate signal timing and bus activity during sensor bring-up.
+</em></p>
+
+<p align="center">
+  <img src="docs/images/i2c_protocol.jpg" width="750">
+</p>
+
+<p align="center"><em>
+WaveForms protocol-decoder output showing decoded I2C traffic, including address, write transaction, ACK behavior, and transmitted data bytes.
+</em></p>
+
 ## Lab Progression
 
 ### RTOS Foundations
