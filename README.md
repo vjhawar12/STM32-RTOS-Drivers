@@ -65,7 +65,7 @@ WaveForms protocol-decoder output showing decoded I2C traffic, including address
 </em></p>
 
 <p align="center">
-  <img src="/photos/stm32_setup.jpg" width="750">
+  <img src="/photos/stm32_setup.jpeg" width="750">
 </p>
 
 <p align="center"><em>
