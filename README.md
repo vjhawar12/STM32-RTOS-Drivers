@@ -70,7 +70,7 @@ WaveForms protocol-decoder output showing decoded I2C traffic, including address
 </p>
 
 <p align="center"><em>
-STM32 Nucleo Board setup with laptop for UART communication.
+STM32 Nucleo board setup connected to a laptop for flashing, UART debug output, and hardware bring-up validation.
 </em></p>
 
 ## Lab Progression
