@@ -49,7 +49,7 @@ Breadboard hardware setup for the STM32 sensor-interface labs, with an external 
 </em></p>
 
 <p align="center">
-  <img src="docs/images/i2c_logic_analyzer.jpg" width="750">
+  <img src="/photos/i2c_logic_analyzer.jpg" width="750">
 </p>
 
 <p align="center"><em>
@@ -57,11 +57,19 @@ Logic-analyzer capture of an I2C transaction used to validate signal timing and 
 </em></p>
 
 <p align="center">
-  <img src="docs/images/i2c_protocol.jpg" width="750">
+  <img src="/photos/i2c_protocol.jpg" width="750">
 </p>
 
 <p align="center"><em>
 WaveForms protocol-decoder output showing decoded I2C traffic, including address, write transaction, ACK behavior, and transmitted data bytes.
+</em></p>
+
+<p align="center">
+  <img src="/photos/stm32_setup.jpg" width="750">
+</p>
+
+<p align="center"><em>
+STM32 Nucleo Board setup with laptop for UART communication.
 </em></p>
 
 ## Lab Progression
