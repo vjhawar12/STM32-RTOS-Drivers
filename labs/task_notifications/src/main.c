@@ -7,6 +7,7 @@
 #include "stdio.h"
 #include "semphr.h"
 #include "uart.h"
+
 #define PERIOD_1S_CYCLES 8084000
 
 TaskHandle_t main_task_handle, background_task_handle; 
