@@ -1,3 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
-st-flash write build/FreeRTOS_Zephyr_Labs.bin 0x08000000
+FIRMWARE_NAME="${1:-vehicle_telemetry}"
+st-flash write "build/${FIRMWARE_NAME}.bin" 0x08000000

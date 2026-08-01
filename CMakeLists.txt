@@ -1,15 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(FreeRTOS_Zephyr_Labs C ASM)
-
+project(STM32_Vehicle_Telemetry C ASM)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-set(LAB_NAME "periodic_tasks" CACHE STRING "Lab to build")
+# The product-level telemetry application is the default build. Existing labs
+# remain available through -DBUILD_LAB=ON -DLAB_NAME=<directory>.
+option(BUILD_LAB "Build one of the standalone FreeRTOS labs" OFF)
+set(APP_NAME "vehicle_telemetry" CACHE STRING "Application under apps/ to build")
+set(LAB_NAME "periodic_tasks" CACHE STRING "Lab under labs/ to build when BUILD_LAB=ON")
 
 set(MCU_FLAGS
     -mcpu=cortex-m4
@@ -63,34 +65,42 @@ set(FREERTOS_SOURCES
     ${CMAKE_SOURCE_DIR}/freertos/event_groups.c
 )
 
-set(LAB_MAIN
-    ${CMAKE_SOURCE_DIR}/labs/${LAB_NAME}/src/main.c
-)
+if(BUILD_LAB)
+    set(ENTRY_SOURCE ${CMAKE_SOURCE_DIR}/labs/${LAB_NAME}/src/main.c)
+    set(FIRMWARE_TARGET ${LAB_NAME})
+else()
+    set(ENTRY_SOURCE ${CMAKE_SOURCE_DIR}/apps/${APP_NAME}/src/main.c)
+    set(FIRMWARE_TARGET ${APP_NAME})
+endif()
 
-add_executable(${PROJECT_NAME}.elf
+if(NOT EXISTS ${ENTRY_SOURCE})
+    message(FATAL_ERROR "Selected firmware entry point does not exist: ${ENTRY_SOURCE}")
+endif()
+
+add_executable(${FIRMWARE_TARGET}.elf
     ${DEVICE_SOURCES}
     ${COMMON_SOURCES}
     ${FREERTOS_SOURCES}
-    ${LAB_MAIN}
+    ${ENTRY_SOURCE}
 )
 
-target_include_directories(${PROJECT_NAME}.elf PRIVATE
+target_include_directories(${FIRMWARE_TARGET}.elf PRIVATE
     ${CMAKE_SOURCE_DIR}/common/inc
     ${CMAKE_SOURCE_DIR}/common/drivers
     ${CMAKE_SOURCE_DIR}/cmsis/core
     ${CMAKE_SOURCE_DIR}/cmsis/device/stm32f4xx
 )
 
-target_compile_definitions(${PROJECT_NAME}.elf PRIVATE
+target_compile_definitions(${FIRMWARE_TARGET}.elf PRIVATE
     STM32F401xE
 )
 
-add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
+add_custom_command(TARGET ${FIRMWARE_TARGET}.elf POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex
-            $<TARGET_FILE:${PROJECT_NAME}.elf>
-            ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.hex
+            $<TARGET_FILE:${FIRMWARE_TARGET}.elf>
+            ${CMAKE_BINARY_DIR}/${FIRMWARE_TARGET}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary
-            $<TARGET_FILE:${PROJECT_NAME}.elf>
-            ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.bin
-    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${PROJECT_NAME}.elf>
+            $<TARGET_FILE:${FIRMWARE_TARGET}.elf>
+            ${CMAKE_BINARY_DIR}/${FIRMWARE_TARGET}.bin
+    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${FIRMWARE_TARGET}.elf>
 )
