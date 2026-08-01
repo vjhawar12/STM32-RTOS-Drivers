@@ -1,126 +1,148 @@
-# STM32 RTOS Drivers with FreeRTOS
+# STM32 Vehicle Telemetry and Health-Monitoring Node
 
-A hands-on embedded firmware lab series focused on **FreeRTOS**, **register-level STM32 drivers**, and **hardware/software integration** on microcontrollers.
+A FreeRTOS-based embedded telemetry node built on the STM32F401RE. The system acquires motion and proximity data using custom register-level drivers, classifies operating conditions, reports timestamped telemetry, and supervises task health using event groups and the independent watchdog.
 
-This repository builds from core RTOS primitives into practical embedded applications: task scheduling, deterministic timing, queues, semaphores, mutexes, interrupt-to-task signaling, peripheral driver integration, and system diagnostics.
+The repository is organized around the integrated deliverable. The earlier FreeRTOS exercises remain available under `labs/` as supporting examples and development history.
 
-## Highlights
+## System Overview
 
-- Register-level STM32F401RE peripheral configuration using CMSIS
-- FreeRTOS task scheduling, queues, semaphores, mutexes, timers, and task notifications
-- Custom SPI driver and ADXL345 accelerometer driver
-- Custom I2C driver and VL6180 TOF sensor driver
-- Custom UART driver
-- RTOS-based sensor acquisition and processing pipeline
-- Modular driver/application separation for reusable embedded firmware
+```text
+ADXL345 over SPI ──> accelerometer task ──┐
+                                          ├──> sensor queue
+VL6180 over I2C ──> proximity task ───────┘         │
+                                                     v
+                                           state processing task
+                                                     │
+                                                     v
+                                                UART telemetry
 
----
+critical task check-ins ──> event group ──> watchdog supervisor
+                                     │
+                                     └──> stack / heap / queue reporting
+```
+
+## Current Capabilities
+
+- STM32F401RE firmware written in C with CMSIS and FreeRTOS
+- Register-level SPI2, I2C, UART, timer, GPIO-interrupt, and IWDG support
+- ADXL345 accelerometer driver with multi-byte XYZ acquisition
+- VL6180 time-of-flight distance sensor driver
+- Independent sensor acquisition tasks
+- ISR-to-task signaling using task notifications
+- Queue-based sensor data transport
+- Rule-based motion, proximity, and combined-system state classification
+- Timestamped UART telemetry
+- Stack high-water-mark, heap, uptime, and queue-space reporting
+- Conditional watchdog refresh after required tasks report liveness
+
+## Repository Layout
+
+```text
+apps/
+  vehicle_telemetry/
+    src/main.c              Product-level firmware entry point
+
+common/
+  drivers/                  Reusable bus and sensor drivers
+  inc/                      Platform and interrupt interfaces
+  src/                      STM32F401RE platform implementation
+
+labs/                       Standalone FreeRTOS and driver exercises
+freertos/                   FreeRTOS kernel sources and port
+cmsis/                      CMSIS core and STM32 device support
+linker/                     STM32F401RE linker script
+photos/                     Hardware and logic-analyzer evidence
+```
+
+## Build the Telemetry Application
+
+The telemetry application is the default target.
+
+```bash
+./build.sh
+```
+
+This produces:
+
+```text
+build/vehicle_telemetry.elf
+build/vehicle_telemetry.hex
+build/vehicle_telemetry.bin
+build/STM32_Vehicle_Telemetry.map
+```
+
+Flash it with:
+
+```bash
+./flash.sh
+```
+
+## Build an Existing Lab
+
+The labs are preserved and can be selected explicitly:
+
+```bash
+./build.sh -DBUILD_LAB=ON -DLAB_NAME=queues
+```
+
+Flash the selected lab by passing its target name:
+
+```bash
+./flash.sh queues
+```
 
 ## Low-Level Driver Work
 
-This repo includes multiple drivers: 
+- `common/drivers/spi.c` — SPI2 clock, GPIO alternate functions, mode configuration, chip-select control, and blocking transfers
+- `common/drivers/adxl345.c` — register access, device identity check, configuration, and XYZ sample acquisition
+- `common/drivers/i2c.c` — register-level I2C transactions including 16-bit register addressing
+- `common/drivers/vl6180.c` — device identity, ranging configuration, continuous measurements, and interrupt-driven task notification
+- `common/drivers/uart.c` — USART2 initialization and serial input/output
 
-1. A register-level SPI2 driver for the STM32F401RE
-2. An ADXL345 accelerometer driver layered on the SPI driver
-3. A register-level I2C driver for the STM32F401RE
-4. A VL6180 TOF sensor driver layered on the I2C driver
-5. A UART driver used throughout the project
+## Hardware Validation
 
-Written in the following files: 
-
-- `common/drivers/spi.c` — SPI2 initialization, GPIO alternate-function setup, chip-select control, and blocking SPI transfers
-- `common/drivers/adxl345.c` — ADXL345 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
-- `common/drivers/i2c.c` — I2C initialization, GPIO alternate-function setup, ACK/NACK reception, and blocking I2C transfers
-- `common/drivers/vl6180.c` — VL6180 register access, device ID check, measurement configuration, and multi-byte XYZ sample reads
-- `common/drivers/uart.c` — UART initialization, char/byte/string transfer, blocking and non-blocking functions
-
-This demonstrates direct peripheral configuration, reusable bus-driver design, and device-driver integration under FreeRTOS.
-
----
-
-## Hardware Photos
-The labs were tested on physical STM32 Nucleo hardware with external sensor modules, UART logging, and logic-analyzer/protocol-decoder validation of I2C traffic.
+The firmware has been exercised on an STM32 Nucleo board with external sensor modules. I2C activity was inspected using a logic analyzer and protocol decoder during sensor bring-up.
 
 <p align="center">
   <img src="/photos/sensor_breadboard.jpg" width="750">
 </p>
 
-<p align="center"><em>
-Breadboard hardware setup for the STM32 sensor-interface labs, with an external sensor module wired for I2C validation.
-</em></p>
-
 <p align="center">
   <img src="/photos/i2c_logic_analyzer.jpg" width="750">
 </p>
-
-<p align="center"><em>
-Logic-analyzer capture of an I2C transaction used to validate signal timing and bus activity during sensor bring-up.
-</em></p>
 
 <p align="center">
   <img src="/photos/i2c_protocol.jpg" width="750">
 </p>
 
-<p align="center"><em>
-WaveForms protocol-decoder output showing decoded I2C traffic, including address, write transaction, ACK behavior, and transmitted data bytes.
-</em></p>
-
 <p align="center">
   <img src="/photos/stm32_setup.jpeg" width="750">
 </p>
 
-<p align="center"><em>
-STM32 Nucleo board setup connected to a laptop for flashing, UART debug output, and hardware bring-up validation.
-</em></p>
+## Development Roadmap
 
-## Lab Progression
+The next major milestone is wireless telemetry:
 
-### RTOS Foundations
+1. Define a versioned telemetry packet with sequence number, timestamp, health flags, and checksum.
+2. Add a dedicated network transmit queue and communications task.
+3. Interface the STM32 with a Wi-Fi coprocessor over a separate UART.
+4. Transmit telemetry over UDP without blocking sensor acquisition.
+5. Add a Python receiver for packet validation, logging, and live visualization.
+6. Add reconnection handling, packet-loss counters, stale-data detection, and fault-injection tests.
 
-| Lab | Topic | Concepts |
-|---|---|---|
-| Lab 1 | Multiple Tasks and Priorities | task creation, scheduling, priorities, stack sizing |
-| Lab 2 | Periodic Tasks | `vTaskDelayUntil()`, deterministic timing, periodic execution |
-| Lab 3 | Queues | producer/consumer design, inter-task data transfer |
-| Lab 4 | Binary Semaphores | event signaling, blocked task behavior |
-| Lab 5 | Mutexes | shared resource protection, priority inversion awareness |
-| Lab 6 | Task Notifications | lightweight task signaling |
-| Lab 7 | Software Timers | one-shot timers, periodic timers, deferred actions |
-| Lab 8 | Interrupts with RTOS | `FromISR` APIs, ISR-to-task signaling |
-| Lab 9 | UART CLI | command parsing, runtime debug interface |
+See `docs/architecture.md` for the intended module boundaries.
 
-### Hardware Integration and System Design
+## Supporting FreeRTOS Examples
 
-| Lab | Topic | Concepts |
-|---|---|---|
-| Lab 10 | SPI Accelerometer Integration | ADXL345 driver, acquisition task, queue-based processing |
-| Lab 11 | I2C TOF Sensor Integration | I2C bus driver, proximity/range sensor driver, periodic sampling |
-| Lab 12 | Multi-Sensor RTOS Application | SPI + I2C telemetry, mixed-rate tasks, modular architecture |
-| Lab 13 | System Health and Reliability | stack/heap monitoring, watchdog concepts, fault handling |
+The `labs/` directory documents the progression used to build the final system, including:
 
----
+- Task creation, priorities, and periodic scheduling
+- Queues, semaphores, mutexes, notifications, and timers
+- Interrupt-to-task signaling
+- UART command handling
+- SPI accelerometer integration
+- I2C distance-sensor integration
+- Multi-sensor processing
+- Runtime health monitoring and watchdog supervision
 
-## Current Focus
-
-The current hardware integration path is centered on building a small drone/robotics-style telemetry node:
-
-```text
-SPI accelerometer task      ┐
-                            ├── sensor queue → processing/logging task → UART output
-I2C distance sensor task    ┘
-```
-
-## Deliverable
-
-Lab 13 is implemented as `labs/health_monitor_sensor_fusion`.
-
-It uses the sensor fusion features:
-- TOF and Accelerometer sensor data acquisition
-- Sensor data processing and UART transmission
-
-And extends the sensor fusion demo with:
-- stack high-water mark reporting
-- heap and uptime reporting
-- queue space monitoring
-- event-group task liveness bits
-- IWDG watchdog refresh only when all monitored tasks check in
+These remain buildable examples, but the primary deliverable is now `apps/vehicle_telemetry`.
