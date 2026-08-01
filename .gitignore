@@ -35,6 +35,7 @@
 !.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/tasks.json
+.settings
 
 # OS / editor junk
 .DS_Store
