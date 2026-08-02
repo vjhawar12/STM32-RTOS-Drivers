@@ -2,13 +2,15 @@
 #define FREERTOS_CONFIG_H
 
 #include <stdint.h>
+#include "exception.h"
+extern void vHandleException();
 
 /* Clocking */
 #define configCPU_CLOCK_HZ                       80842105UL
 #define configTICK_RATE_HZ                       1000U
 #define configMAX_PRIORITIES                     10
 #define configMINIMAL_STACK_SIZE                 128
-#define configTOTAL_HEAP_SIZE                    8 * 1024U
+#define configTOTAL_HEAP_SIZE                    16 * 1024U
 #define configMAX_TASK_NAME_LEN                  16
 #define configUSE_16_BIT_TICKS                   0
 
@@ -67,5 +69,6 @@
 #define vPortSVCHandler      SVC_Handler
 #define xPortPendSVHandler   PendSV_Handler
 #define xPortSysTickHandler  SysTick_Handler
+#define configASSERT(condition) do { if (!(condition)) {vHandleException(__FILE__, __LINE__);} } while (0)
 
 #endif

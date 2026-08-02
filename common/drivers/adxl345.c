@@ -48,10 +48,10 @@ bool adxl345_init() {
     value &= ~(1 << SPI_BIT); 
     adxl345_write_reg(DATA_FORMAT, value);
     // set range
-    adxl345_set_range(G8); 
+    adxl345_set_range(G16); 
     // set full resolution
     value = adxl345_read_reg(DATA_FORMAT); 
-    value &= ~(1 << FULL_RES_BIT); 
+    value |= (1 << FULL_RES_BIT); 
     adxl345_write_reg(DATA_FORMAT, value);
     // starting measurement  
     adxl345_start_measure();

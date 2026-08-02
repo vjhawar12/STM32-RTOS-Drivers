@@ -47,6 +47,7 @@ set(DEVICE_SOURCES
 
 set(COMMON_SOURCES
     ${CMAKE_SOURCE_DIR}/common/src/platform.c
+    ${CMAKE_SOURCE_DIR}/common/src/exception.c
     ${CMAKE_SOURCE_DIR}/common/drivers/spi.c
     ${CMAKE_SOURCE_DIR}/common/drivers/adxl345.c
     ${CMAKE_SOURCE_DIR}/common/drivers/i2c.c

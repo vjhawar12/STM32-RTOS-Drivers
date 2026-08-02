@@ -16,10 +16,11 @@ typedef struct adxl345_sample_t {
     int16_t accel_x; 
     int16_t accel_y;
     int16_t accel_z;
-    int16_t mag_sq;
-    int16_t mag_sq_prev;
+    int32_t mag_sq;
+    int32_t mag_sq_prev;
     int16_t delta;
     uint32_t timestamp;
+    bool valid;
 } adxl345_sample_t;
 
 // pull cs low (motorola mode), send command byte, send dummy byte, return received byte

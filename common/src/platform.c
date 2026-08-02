@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include "irq.h"
 #include "stdint.h"
+#include "FreeRTOSConfig.h"
 
 void PLL_Init(void) {
     /* Disable PLL */
@@ -92,6 +93,7 @@ void timer2_init(uint16_t reload) {
     TIM2->ARR = (uint16_t)reload;
     TIM2->PSC = 8083; // 80.84 MHZ / (8083 + 1) = 10000 hz => period = 0.1 ms
     TIM2->DIER |= (1 << 0); // interrupt enable
+    NVIC_SetPriority(TIM2_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
     NVIC_EnableIRQ(TIM2_IRQn); 
     TIM2->SR = 0;
     NVIC_ClearPendingIRQ(TIM2_IRQn);
@@ -135,19 +137,16 @@ void USART2_IRQHandler() {
 
 void burn_cycles(uint32_t cycles) {
     while (cycles) {
-        __asm volatile("nop");
+        __asm__ volatile("nop");
         cycles--;
     }
 }
 
-void enable_gpio_interrupts() {
-    // writing 0000 to SYSCFG_EXTICR2 at bit 0
-    SYSCFG->EXTICR[2] &= ~(0b1111 << 0); 
-    NVIC_EnableIRQ(8); 
-}
-
-void EXTI2_IRQHandler() {
-    tof_isr();
+void EXTI4_IRQHandler() {
+    if ((EXTI->PR & (1 << 4)) == 0) {
+        EXTI->PR = (1 << 4);
+        tof_isr();
+    }
 }
 
 void iwdg_init() {
