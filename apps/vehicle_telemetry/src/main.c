@@ -8,7 +8,6 @@
 #include "task.h"
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
 #include "stdio.h"
 #include "semphr.h"
 #include "timers.h"
@@ -116,28 +115,42 @@ typedef struct mixed_sensor_data_t {
 } mixed_sensor_data_t;
 
 typedef struct message_t {
-    uint16_t size;
+    uint16_t size; // includes null character
     char buffer[MAX_MESSAGE_SIZE]; 
 } message_t;
 
-QueueHandle_t sensor_queue, uart_queue;
+typedef enum message_status_t {
+    INVALID_MESSAGE,
+    MESSAGE_STORED,
+    MESSAGE_DROPPED
+} message_status_t;
+
+QueueHandle_t sensor_queue, message_queue;
+uint8_t dropped_messages;
 TaskHandle_t tof_task_handle, accel_task_handle, processing_task_handle, health_task_handle;
 EventGroupHandle_t sensor_group;
 
-void store_message(const char* buffer, const uint16_t size) {
+message_status_t store_message(const char* buffer) {
     message_t message;
-    message.size = size;
-    strncpy(message.buffer, buffer, size);
-    xQueueSend(uart_queue, &message,  pdMS_TO_TICKS(30)); 
+    if (strlen(buffer) < 1 || strlen(buffer) >= MAX_MESSAGE_SIZE - 1) {
+        return INVALID_MESSAGE;
+    }
+    message.size = strlen(buffer) + 1;
+    strncpy(message.buffer, buffer, message.size);
+    message.buffer[message.size - 1] = 0;
+    if (xQueueSend(message_queue, &message,  pdMS_TO_TICKS(30)) == pdPASS) {
+        return MESSAGE_STORED;
+    } else {
+        dropped_messages++;
+        return MESSAGE_DROPPED;
+    }
 }
 
 void print_message(void* pvParams) {
     message_t message;
     while (1) {
-        xQueueReceive(uart_queue, &message, portMAX_DELAY); 
-        if (message.size > 0 && message.size < MAX_MESSAGE_SIZE) {
-            uart_outstring(message.buffer); 
-        } 
+        xQueueReceive(message_queue, &message, portMAX_DELAY); 
+        uart_outstring(message.buffer); 
     }
 }
 
@@ -147,7 +160,7 @@ void periodic_timer_isr(void) {
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
-char *get_label(int value, message_type_t message_type) {
+const char *get_label(int value, message_type_t message_type) {
     if (message_type == ACCEL) {
         switch (value) {
             case IMPACT_NORMAL: return "TYPICAL DRIVING VIBRATION";
@@ -177,6 +190,7 @@ char *get_label(int value, message_type_t message_type) {
             default: return "SYS INVALID";
         }
     }
+    return "INVALID";
  }
 
 void tof_data_retrieval(void *pvParams) {
@@ -318,13 +332,13 @@ void data_processing(void *pvParams) {
             }
             current_tof_state = data.state;
         }
-        store_message(buffer, sizeof(buffer));
+        configASSERT(store_message(buffer) != INVALID_MESSAGE);
         if (have_tof && have_accel && abs(tof_timestamp - accel_timestamp) < threshold_ms) {
             snprintf(buffer, sizeof(buffer),
                  "[%u ms] System State: %s\r\n",
                  xTaskGetTickCount() * 1000 / configTICK_RATE_HZ,
                  get_label(get_system_state(current_tof_state, current_accel_state), SYS));
-            store_message(buffer, sizeof(buffer));
+            configASSERT(store_message(buffer) != INVALID_MESSAGE);
         } 
         xEventGroupSetBits(sensor_group, PROCESSING_BIT);
     }
@@ -342,16 +356,16 @@ void health_monitor(void *pvParams) {
         snprintf(buffer, sizeof(buffer),
                  "\r\n[HEALTH] Stack space free:\r\nTOF: %u\r\nAccel: %u\r\nProcessing: %u\r\n",
                  tof_watermark, accel_watermark, processing_watermark);
-        store_message(buffer, sizeof(buffer));
+        configASSERT(store_message(buffer) != INVALID_MESSAGE);
         snprintf(buffer, sizeof(buffer), "[HEALTH] Heap free: %u\r\n",
                  (unsigned)xPortGetFreeHeapSize());
-        store_message(buffer, sizeof(buffer));
+        configASSERT(store_message(buffer) != INVALID_MESSAGE);
         snprintf(buffer, sizeof(buffer), "[HEALTH] Uptime: %u ms\r\n",
                  (unsigned)(xTaskGetTickCount() * 1000 / configTICK_RATE_HZ));
-        store_message(buffer, sizeof(buffer));
+        configASSERT(store_message(buffer) != INVALID_MESSAGE);
         snprintf(buffer, sizeof(buffer), "[HEALTH] Queue free spaces: %u\r\n",
                  (unsigned)uxQueueSpacesAvailable(sensor_queue));
-        store_message(buffer, sizeof(buffer));
+        configASSERT(store_message(buffer) != INVALID_MESSAGE);
     }
 }
 
@@ -370,7 +384,7 @@ void watchdog_task(void *pvParams) {
         } else {
             xEventGroupClearBits(sensor_group, REQUIRED_BITS);
             char buffer[128] = "WATCHDOG CHECK-IN FAILED\r\n";
-            store_message(buffer, sizeof(buffer));
+            configASSERT(store_message(buffer) != INVALID_MESSAGE);
         }
     }
 }
@@ -387,11 +401,11 @@ int main(void) {
     spi_init();
     iwdg_init();
     periodic_timer_init(PERIOD_100MS);
-    vl6180_init();
+    configASSERT(vl6180_init() != false);
     sensor_queue = xQueueCreate(8, sizeof(mixed_sensor_data_t));
     configASSERT(sensor_queue != NULL);
-    uart_queue = xQueueCreate(10, sizeof(message_t));
-    configASSERT(uart_queue != NULL);
+    message_queue = xQueueCreate(10, sizeof(message_t));
+    configASSERT(message_queue != NULL);
     sensor_group = xEventGroupCreate();
     configASSERT(sensor_group != NULL);
     configASSERT(xTaskCreate(tof_data_retrieval, "tof", 512, NULL, 7, &tof_task_handle) == pdPASS);
@@ -400,7 +414,7 @@ int main(void) {
     configASSERT(xTaskCreate(health_monitor, "health", 128, NULL, 3, &health_task_handle) == pdPASS);
     configASSERT(xTaskCreate(watchdog_task, "watchdog", 256, NULL, 8, NULL) == pdPASS);
     configASSERT(xTaskCreate(print_message, "log", 128, NULL, 2, NULL) == pdPASS);
-    uart_enable_rx_interrupt();
+    // uart_enable_rx_interrupt();
     if (!adxl345_init()) {
         uart_outstring("Could not reach ADXL345 sensor!\r\n");
     }

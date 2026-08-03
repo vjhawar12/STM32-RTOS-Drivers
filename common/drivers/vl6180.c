@@ -14,6 +14,7 @@
 
 MODE mode;
 TaskHandle_t acquisition_task_handle; 
+uint8_t vl6180_error;
 
 bool vl6180_alive() {
     uint8_t id = 0; 
@@ -54,17 +55,20 @@ bool vl6180_init() {
     i2c_write_reg16(VL6180_I2C_ADDR, SYSRANGE__THRESH_LOW, 0x05); 
     i2c_write_reg16(VL6180_I2C_ADDR, SYSRANGE__INTERMEASUREMENT_PERIOD, 0x0A); 
     i2c_write_reg16(VL6180_I2C_ADDR, SYSTEM__MODE_GPIO1, 0b010000); 
-    uint8_t error = 0xF;
-    i2c_read_reg16(VL6180_I2C_ADDR, RESULT__RANGE_STATUS, &error); 
-    return error == 0;
+    vl6180_error = 0xF;
+    i2c_read_reg16(VL6180_I2C_ADDR, RESULT__RANGE_STATUS, &vl6180_error); 
+    return (vl6180_error >> 4) == 0;
 }
 
 void vl6180_set_continuous(TaskHandle_t _acquisition_task_handle) {
+    configASSERT(_acquisition_task_handle);
     mode = CONTINUOUS;
     acquisition_task_handle = _acquisition_task_handle;
+    i2c_write_reg16(VL6180_I2C_ADDR, SYSTEM__INTERRUPT_CONFIG_GPIO, (0b100 << 0));
+    vl6180_clear_interrupt();
+    EXTI->PR = (1 << 4);
     EXTI->IMR |= (1 << 4);
     i2c_write_reg16(VL6180_I2C_ADDR, SYSRANGE__START,  0b11); 
-    i2c_write_reg16(VL6180_I2C_ADDR, SYSTEM__INTERRUPT_CONFIG_GPIO, (0b100 << 0));
 }   
 
 void vl6180_set_singleshot() {

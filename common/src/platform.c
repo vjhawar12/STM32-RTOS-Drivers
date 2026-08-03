@@ -143,7 +143,9 @@ void burn_cycles(uint32_t cycles) {
 }
 
 void EXTI4_IRQHandler() {
-    if ((EXTI->PR & (1 << 4)) == 0) {
+    // write 1 to clear
+    // read 1 ==> pending
+    if ((EXTI->PR & (1 << 4)) != 0) {
         EXTI->PR = (1 << 4);
         tof_isr();
     }

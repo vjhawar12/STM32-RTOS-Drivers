@@ -20,6 +20,8 @@ typedef struct exception_t {
     uint32_t PC;
     char *file;
     int line;
+    uint8_t dropped_messages;   
+    uint8_t vl6180_error;
 } exception_t;
 
 void vHandleException(const char* file, const int line);
