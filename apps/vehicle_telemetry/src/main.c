@@ -154,6 +154,10 @@ void print_message(void* pvParams) {
     }
 }
 
+void print_telemetry() {
+
+}
+
 void periodic_timer_isr(void) {
     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(accel_task_handle, &pxHigherPriorityTaskWoken);
@@ -296,7 +300,7 @@ void data_processing(void *pvParams) {
     mixed_sensor_data_t data;
     tof_state current_tof_state = SUS_UNKNOWN; 
     accel_state current_accel_state = IMPACT_UNKNOWN; 
-    char buffer[128];
+    char buffer[128], machine_buffer[128];
     bool have_tof = false, have_accel = false;
     int tof_timestamp = 0;
     int accel_timestamp = 0;
@@ -314,6 +318,13 @@ void data_processing(void *pvParams) {
                     data.data.accel.accel_y,
                     data.data.accel.accel_z,
                     get_label(data.state, ACCEL));
+                 snprintf(machine_buffer, sizeof(machine_buffer),
+                    "[ACCEL]%u,%d,%d,%d\r\n",
+                    data.data.accel.timestamp,
+                    data.data.accel.accel_x,
+                    data.data.accel.accel_y,
+                    data.data.accel.accel_z,
+                    get_label(data.state, ACCEL));
             } else {
                 snprintf(buffer, sizeof(buffer), "[%u ms] Invalid acceleration data", data.data.accel.timestamp);
             }
@@ -323,16 +334,22 @@ void data_processing(void *pvParams) {
             if (data.data.tof.valid) {
                 tof_timestamp = data.data.tof.timestamp;
                 snprintf(buffer, sizeof(buffer),
-                "[%u ms] TOF distance: %d mm | %s\r\n",
-                data.data.tof.timestamp,
-                data.data.tof.distance,
-                get_label(data.state, TOF));
+                    "[%u ms] TOF distance: %d mm | %s\r\n",
+                    data.data.tof.timestamp,
+                    data.data.tof.distance,
+                    get_label(data.state, TOF));
+                snprintf(machine_buffer, sizeof(machine_buffer),
+                    "[TOF]%u,%d\r\n",
+                    data.data.tof.timestamp,
+                    data.data.tof.distance,
+                    get_label(data.state, TOF));
             } else {
                 snprintf(buffer, sizeof(buffer), "[%u ms] Invalid TOF data", data.data.tof.timestamp);
             }
             current_tof_state = data.state;
         }
         configASSERT(store_message(buffer) != INVALID_MESSAGE);
+        configASSERT(store_message(machine_buffer) != INVALID_MESSAGE);
         if (have_tof && have_accel && abs(tof_timestamp - accel_timestamp) < threshold_ms) {
             snprintf(buffer, sizeof(buffer),
                  "[%u ms] System State: %s\r\n",
